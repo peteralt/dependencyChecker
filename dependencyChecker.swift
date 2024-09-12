@@ -14,7 +14,7 @@ func runShellCommand(_ command: String) -> (output: String?, exitCode: Int32) {
     task.standardOutput = pipe
     task.standardError = pipe
     task.arguments = ["-c", command]
-    task.executableURL = URL(fileURLWithPath: "/bin/zsh") // You can adjust this for your shell
+    task.executableURL = URL(fileURLWithPath: "/bin/zsh")  // Adjust if needed
 
     do {
         try task.run()
@@ -61,14 +61,19 @@ func checkHTTPURL(_ urlString: String) {
 
 // Function to test an SSH URL
 func checkSSHURL(_ urlString: String) {
-    // Using git ls-remote to check if the SSH URL is accessible
-    let command = "git ls-remote \(urlString)"
-    let result = runShellCommand(command)
+    let gitCommand = "git ls-remote \(urlString)"
+    let result = runShellCommand(gitCommand)
 
     if result.exitCode == 0 {
         print("\(green)\(urlString): Accessible via SSH\(reset)")
-    } else {
-        print("\(red)\(urlString): Error accessing via SSH (Exit Code: \(result.exitCode))\(reset)")
+    } else if let output = result.output {
+        if output.contains("Permission denied") || output.contains("passphrase") {
+            // Detected SSH passphrase prompt or permission issue
+            print("\(red)\(urlString): SSH access failed due to passphrase or permission issues.\(reset)")
+            exit(1)  // Exit the script on passphrase request
+        } else {
+            print("\(red)\(urlString): Error accessing via SSH (Exit Code: \(result.exitCode))\(reset)")
+        }
     }
 }
 
