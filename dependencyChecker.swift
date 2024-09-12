@@ -6,10 +6,33 @@ let green = "\u{001B}[0;32m"
 let yellow = "\u{001B}[0;33m"
 let reset = "\u{001B}[0;0m"
 
-// Function to test a URL and return status with colored output
-func checkURL(_ urlString: String) {
+// Function to run shell commands
+func runShellCommand(_ command: String) -> (output: String?, exitCode: Int32) {
+    let task = Process()
+    let pipe = Pipe()
+
+    task.standardOutput = pipe
+    task.standardError = pipe
+    task.arguments = ["-c", command]
+    task.executableURL = URL(fileURLWithPath: "/bin/zsh") // You can adjust this for your shell
+
+    do {
+        try task.run()
+    } catch {
+        return (nil, task.terminationStatus)
+    }
+
+    let data = pipe.fileHandleForReading.readDataToEndOfFile()
+    let output = String(data: data, encoding: .utf8)
+
+    task.waitUntilExit()
+    return (output, task.terminationStatus)
+}
+
+// Function to test an HTTPS URL
+func checkHTTPURL(_ urlString: String) {
     guard let url = URL(string: urlString) else {
-        print("\(red)Invalid URL: \(urlString)\(reset)")
+        print("\(red)Invalid HTTPS URL: \(urlString)\(reset)")
         return
     }
 
@@ -34,6 +57,30 @@ func checkURL(_ urlString: String) {
 
     task.resume()
     semaphore.wait()
+}
+
+// Function to test an SSH URL
+func checkSSHURL(_ urlString: String) {
+    // Using git ls-remote to check if the SSH URL is accessible
+    let command = "git ls-remote \(urlString)"
+    let result = runShellCommand(command)
+
+    if result.exitCode == 0 {
+        print("\(green)\(urlString): Accessible via SSH\(reset)")
+    } else {
+        print("\(red)\(urlString): Error accessing via SSH (Exit Code: \(result.exitCode))\(reset)")
+    }
+}
+
+// Function to check URL, and determine whether it's HTTP(S) or SSH
+func checkURL(_ urlString: String) {
+    if urlString.hasPrefix("http://") || urlString.hasPrefix("https://") {
+        checkHTTPURL(urlString)
+    } else if urlString.hasPrefix("git@") || urlString.hasPrefix("ssh://") {
+        checkSSHURL(urlString)
+    } else {
+        print("\(yellow)Unsupported URL scheme: \(urlString)\(reset)")
+    }
 }
 
 // Check if file path is provided as an argument
